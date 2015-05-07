@@ -1,0 +1,205 @@
+cameras:
+    camera1:
+        type: perspective
+        focal_length: 2 # pairs of [zoom, focal len]
+        vanishing_point: [-250, -250] # relative to center of screen, in pixels
+
+lights:
+    light1:
+        type: directional
+        direction: [0, 1, -.5]
+        diffuse: .3
+        ambient: 1
+    light2:
+        type: point
+        direction: [0, 1, -.5]
+        diffuse: 0
+        ambient: 0
+        specular: 1
+        position: [0, 0, 100px]
+        origin: ground
+        attenuation: .01
+        radius: [0, 1000px]
+
+sources:
+    osm:
+        type: MVT
+        url:  http://vector.mapzen.com/osm/all/{z}/{x}/{y}.mapbox
+
+
+
+styles:
+    wood:
+        base: polygons
+        animated: true
+        material:
+            # normal:
+            #     texture: imgs/normal-0021.jpg
+            #     mapping: uv
+            ambient: 0.8
+            diffuse: 1
+            specular: 1
+        shaders:
+            uniforms:
+                u_dark_color: [1, 0, 0]
+                u_light_color: [0, 0, 1]
+                u_grain_width: 62.8318
+                u_gnarliness: 1
+            blocks:
+                global: |
+                    mat2 rotate2d(float _angle){
+                        return mat2(cos(_angle),-sin(_angle),
+                                    sin(_angle),cos(_angle));
+                    }
+
+                    float random (in vec2 _st) { 
+                        return fract(sin(dot(_st.xy,
+                                             vec2(12.9898,78.233)))* 
+                            43758.5453123);
+                    }
+
+                    float noise (in vec2 _st) {
+                        vec2 i = floor(_st);
+                        vec2 f = fract(_st);
+
+                        // Four corners in 2D of a tile
+                        float a = random(i);
+                        float b = random(i + vec2(1.0, 0.0));
+                        float c = random(i + vec2(0.0, 1.0));
+                        float d = random(i + vec2(1.0, 1.0));
+
+                        vec2 u = f * f * (3.0 - 2.0 * f);
+
+                        return mix(a, b, u.x) +
+                                (c - a)* u.y * (1.0 - u.x) + 
+                                (d - b) * u.x * u.y;
+                    }
+
+                    float getHatch(in vec2 _pos, float _angle, float _brightness){
+                        _pos /= u_grain_width;
+                        _pos *= rotate2d( _angle );
+                        return smoothstep(0.0,0.5+_brightness*0.5,abs((sin(_pos.x*3.1415)+_brightness*2.0))*0.5);
+                        return smoothstep(0.,1.,abs(sin(_pos.x)));
+                    }
+                color: |
+                    // add gnarliness to position, to offset each layer's pattern
+                    vec3 pos = v_world_position.xyz*0.01+vec3(u_gnarliness);
+                    float pattern = getHatch( color.br*20.0+pos.xy+noise(pos.xy)*(2.0*(1.0-color.g)), noise(pos.xy) * u_gnarliness / 100., noise(color.rg*10.0) );
+                    color.rgb = mix(u_dark_color, u_light_color, pattern);
+                    float spattern = getHatch( color.br*20.0+pos.xy+noise(pos.xy)*(2.0*(1.0-color.g)), noise(pos.xy) * u_gnarliness / 100., noise(color.rg*10.0) );
+                    material.specular.rgb = vec3(mix(10., 0., pattern));
+
+
+
+    pine:
+        mix: wood
+        shaders:
+            uniforms:
+                u_dark_color: [0.96, 0.84, 0.64]
+                u_light_color: [0.87, 0.69, 0.42]
+                u_grain_width: 2
+                u_gnarliness: 10
+
+    maple:
+        mix: wood
+        shaders:
+            uniforms:
+                u_dark_color: [0.59, 0.40, 0.31]
+                u_light_color: [0.71, 0.56, 0.41]
+                u_grain_width: 2
+                u_gnarliness: 10
+
+    walnut:
+        mix: wood
+        material:
+            # diffuse: 1
+            specular: 1
+        shaders:
+            uniforms:
+                u_dark_color: [0.34, 0.15, 0.09]
+                u_light_color: [0.52, 0.28, 0.11]
+                u_grain_width: .1
+                u_gnarliness: .2
+
+    cherry:
+        mix: wood
+        shaders:
+            uniforms:
+                u_dark_color: [0.64, 0.37, 0.13]
+                u_light_color: [0.50, 0.21, 0.12]
+                u_grain_width: 1
+                u_gnarliness: 1
+
+    roads:
+        base: lines
+        mix: walnut
+
+
+
+layers:
+    earth:
+        data: { source: osm }
+        draw:
+            cherry:
+                order: 0
+                color: '#ddeeee'
+
+    landuse:
+        data: { source: osm }
+        draw:
+            cherry:
+                order: 1
+                color: '#aaffaa'
+                interactive: true
+
+    water:
+        data: { source: osm }
+        draw:
+            walnut:
+                order: 2
+                color: '#88bbee'
+
+    roads:
+        data: { source: osm }
+        filter:
+            not: { kind: ["path", "rail"] }
+        draw:
+            lines:
+                style: roads
+                order: 3
+                color: gray
+                width: 8
+        highway:
+            filter:
+                kind: highway
+            draw:
+                lines:
+                    order: 2
+                    color: '#cc6666'
+                    width: 12
+        minor_road:
+            filter:
+                kind: minor_road
+            draw:
+                lines:
+                    order: -2
+                    color: lightgrey
+                    width: 5
+    
+    buildings:
+        data: { source: osm }
+        draw:
+            pine:
+                # style: pine
+                order: 4                        
+                # color: |
+                #     function () {
+                #         var h = feature.height || 20;
+                #         h = Math.min((h + 50)/ 250, .8);
+                #         h = Math.max(h, .4);
+                #         return [h, h, h];
+                #     }
+                # color: Style.color.pseudoRandomColor()
+                color: white
+                extrude: true
+
