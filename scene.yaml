@@ -24,7 +24,8 @@ lights:
 sources:
     osm:
         type: TopoJSON
-        url:  //vector.mapzen.com/osm/all/{z}/{x}/{y}.topojson?api_key=vector-tiles-HqUVidw
+        url:  https://tile.nextzen.org/tilezen/vector/v1/256/all/{z}/{x}/{y}.topojson?api_key=d161Q8KATMOhSOcVGNyQ8g
+
 
 
 
